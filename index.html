@@ -369,4 +369,507 @@
 
         <button type="button" class="btn-mode btn-mode-spend" data-mode="spend">
           <span class="btn-mode-icon">🛍️</span>
-          <span
+          <span class="btn-mode-text">
+            단오 사용 (부스2, 3)
+            <small>부스2 창포비누 · 부스3 음식 체험</small>
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <div id="sessionScreen" class="screen">
+
+      <div id="modeBanner" class="mode-banner earn">
+        <i class="bi bi-info-circle-fill"></i>
+        <span id="modeBannerText">-</span>
+      </div>
+
+      <div id="boothPickWrap" class="booth-pick-wrap section-card p-3" style="display:none;">
+        <div class="booth-pick-label">운영 부스를 선택하세요</div>
+        <div class="booth-pill" data-desc="부스2 창포비누">🧼 부스2 창포비누</div>
+        <div class="booth-pill" data-desc="부스3 음식 체험">🍡 부스3 음식 체험</div>
+      </div>
+
+      <div id="scannerSection" class="section-card scanner-wrap" style="display:none;">
+        <div class="scanner-label">
+          <i class="bi bi-qr-code-scan"></i> 학생 QR 스캔
+        </div>
+        <div id="qr-reader"></div>
+        <p class="scan-hint">학생 QR 코드(학번_이름)를 카메라에 비춰 주세요</p>
+      </div>
+
+      <div id="studentCard" class="section-card" style="display:none;">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="student-avatar">
+              <i class="bi bi-person-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="text-muted small">학생 정보</div>
+              <div class="fw-bold fs-5" id="studentName">-</div>
+              <div class="text-secondary small"><span id="studentGrade">-</span>학년</div>
+            </div>
+            <div class="text-end">
+              <div class="text-muted small">현재 잔액</div>
+              <div class="balance-badge">
+                <span id="studentBalance">0</span><span class="unit">원</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="txForm" class="section-card mt-3" style="display:none;">
+        <div class="card-body p-3">
+          <span id="txTypeBadge" class="tx-type-badge earn">적립</span>
+          <div class="text-muted small mb-2" id="txBoothLabel">부스1 퀴즈</div>
+
+          <div class="mb-3">
+            <label for="amountInput" class="form-label">금액 (원)</label>
+            <input type="number" class="form-control form-control-lg" id="amountInput"
+                   placeholder="예: 500" min="1" inputmode="numeric">
+          </div>
+
+          <div class="mb-3">
+            <label for="pinInput" class="form-label">관리자 PIN</label>
+            <input type="password" class="form-control" id="pinInput"
+                   placeholder="PIN 번호 입력" maxlength="8" inputmode="numeric" autocomplete="off">
+          </div>
+
+          <button type="button" class="btn btn-execute w-100 mb-2" id="btnExecute" disabled>
+            <i class="bi bi-check-circle"></i> 실행
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-rescan w-100" id="btnRescan">
+            <i class="bi bi-qr-code-scan"></i> 다른 학생 스캔
+          </button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-outline-secondary btn-back-menu w-100 mt-3" id="btnBackMenu">
+        <i class="bi bi-house"></i> 처음으로 (메뉴 선택)
+      </button>
+    </div>
+
+    <p class="status-bar" id="statusBar">거래 유형을 선택해 주세요</p>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">처리 중...</span>
+    </div>
+  </div>
+
+  <div class="modal fade" id="resultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body text-center p-4">
+          <div class="modal-icon" id="modalIcon"></div>
+          <h5 class="modal-title-text mb-2" id="modalTitle">-</h5>
+          <p class="text-muted mb-0" id="modalMessage" style="white-space: pre-line;">-</p>
+        </div>
+        <div class="modal-footer border-0 justify-content-center pb-4 pt-0">
+          <button type="button" class="btn btn-execute px-5" data-bs-dismiss="modal">확인</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    /* ══════════════════════════════════════════
+       ★ GAS 웹앱 URL을 여기에 붙여넣으세요 ★
+    ══════════════════════════════════════════ */
+    var GAS_URL = 'https://script.google.com/macros/s/AKfycbxxczLM3JmP9Crc-6ACeG81FxQObFsN39WeUk8G8KveGs9S9gz9NWxDiYUmc8N9rPpQDA/exec';
+
+    /* ── GAS API 호출 헬퍼 (GET + script 태그 방식 — CORS 우회) ── */
+    function callGAS(payload) {
+      return new Promise(function(resolve, reject) {
+        var cbName = 'gasCallback_' + Date.now();
+        var params = new URLSearchParams({ action: payload.action });
+
+        Object.keys(payload).forEach(function(k) {
+          if (k !== 'action') params.append(k, payload[k]);
+        });
+        params.append('callback', cbName);
+
+        window[cbName] = function(data) {
+          delete window[cbName];
+          document.getElementById(cbName) && document.getElementById(cbName).remove();
+          resolve(data);
+        };
+
+        var script = document.createElement('script');
+        script.id = cbName;
+        script.src = GAS_URL + '?' + params.toString();
+        script.onerror = function() {
+          delete window[cbName];
+          script.remove();
+          reject(new Error('GAS 서버와 통신할 수 없습니다.'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    /* ── 모드 설정 ── */
+    var MODES = {
+      earn: {
+        banner: '부스 1 퀴즈 적립 모드입니다.',
+        subtitle: '부스1 · 적립 모드',
+        type: '적립',
+        desc: '부스1 퀴즈',
+        bannerClass: 'earn',
+        needsBoothPick: false
+      },
+      spend: {
+        banner: '부스 2 · 3 사용 모드입니다. 운영 부스를 선택한 뒤 QR을 스캔하세요.',
+        subtitle: '부스2·3 · 사용 모드',
+        type: '차감',
+        bannerClass: 'spend',
+        needsBoothPick: true
+      }
+    };
+
+    var state = {
+      phase: 'menu',
+      modeKey: null,
+      txConfig: null,
+      qrId: null,
+      student: null,
+      isProcessing: false,
+      lastScannedId: '',
+      lastScanTime: 0,
+      scannerRunning: false
+    };
+
+    var html5QrCode = null;
+    var resultModal = null;
+
+    function formatMoney(n) {
+      return Number(n || 0).toLocaleString('ko-KR');
+    }
+
+    function setStatus(msg) {
+      document.getElementById('statusBar').textContent = msg;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').classList.toggle('show', show);
+    }
+
+    function showModal(isSuccess, title, message, onClose) {
+      document.getElementById('modalIcon').className = 'modal-icon ' + (isSuccess ? 'success' : 'error');
+      document.getElementById('modalIcon').innerHTML = isSuccess
+        ? '<i class="bi bi-check-circle-fill"></i>'
+        : '<i class="bi bi-x-circle-fill"></i>';
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMessage').textContent = message;
+
+      var modalEl = document.getElementById('resultModal');
+      if (onClose) {
+        modalEl.addEventListener('hidden.bs.modal', function handler() {
+          modalEl.removeEventListener('hidden.bs.modal', handler);
+          onClose();
+        });
+      }
+      resultModal.show();
+    }
+
+    function showEl(id, show) {
+      document.getElementById(id).style.display = show ? '' : 'none';
+    }
+
+    function updateExecuteButton() {
+      var amountOk = Number(document.getElementById('amountInput').value) > 0;
+      var pinOk = document.getElementById('pinInput').value.length > 0;
+      document.getElementById('btnExecute').disabled = !(amountOk && pinOk && state.qrId && state.txConfig);
+    }
+
+    function goToMenu() {
+      stopScanner().then(function() {
+        state.phase = 'menu';
+        state.modeKey = null;
+        state.txConfig = null;
+        state.qrId = null;
+        state.student = null;
+        state.lastScannedId = '';
+        state.lastScanTime = 0;
+
+        document.getElementById('menuScreen').classList.add('active');
+        document.getElementById('sessionScreen').classList.remove('active');
+
+        showEl('scannerSection', false);
+        showEl('studentCard', false);
+        showEl('txForm', false);
+        showEl('boothPickWrap', false);
+
+        document.querySelectorAll('.booth-pill').forEach(function(el) {
+          el.classList.remove('selected');
+        });
+
+        clearTransactionForm(true);
+        document.getElementById('headerSubtitle').textContent = '거래 유형을 선택해 주세요';
+        setStatus('거래 유형을 선택해 주세요');
+      });
+    }
+
+    function enterMode(modeKey) {
+      var mode = MODES[modeKey];
+      state.phase = 'scan';
+      state.modeKey = modeKey;
+      state.qrId = null;
+      state.student = null;
+      state.lastScannedId = '';
+      state.lastScanTime = 0;
+
+      if (modeKey === 'earn') {
+        state.txConfig = { type: mode.type, desc: mode.desc };
+      } else {
+        state.txConfig = null;
+      }
+
+      document.getElementById('menuScreen').classList.remove('active');
+      document.getElementById('sessionScreen').classList.add('active');
+
+      var banner = document.getElementById('modeBanner');
+      banner.className = 'mode-banner ' + mode.bannerClass;
+      document.getElementById('modeBannerText').textContent = mode.banner;
+      document.getElementById('headerSubtitle').textContent = mode.subtitle;
+
+      showEl('studentCard', false);
+      showEl('txForm', false);
+      clearTransactionForm(true);
+
+      if (mode.needsBoothPick) {
+        showEl('boothPickWrap', true);
+        showEl('scannerSection', false);
+        document.querySelectorAll('.booth-pill').forEach(function(el) {
+          el.classList.remove('selected');
+        });
+        setStatus('운영 부스를 선택해 주세요');
+      } else {
+        showEl('boothPickWrap', false);
+        revealScanner();
+      }
+    }
+
+    function selectSpendBooth(desc) {
+      state.txConfig = { type: '차감', desc: desc };
+      revealScanner();
+    }
+
+    function revealScanner() {
+      showEl('scannerSection', true);
+      showEl('studentCard', false);
+      showEl('txForm', false);
+      state.qrId = null;
+      clearTransactionForm(true);
+      startScanner();
+    }
+
+    function enterPayPhase(info) {
+      state.phase = 'pay';
+      stopScanner();
+
+      showEl('scannerSection', false);
+      showEl('studentCard', true);
+      showEl('txForm', true);
+
+      document.getElementById('studentName').textContent = info.name;
+      document.getElementById('studentGrade').textContent = info.grade;
+      document.getElementById('studentBalance').textContent = formatMoney(info.balance);
+
+      var isEarn = state.txConfig.type === '적립';
+      var badge = document.getElementById('txTypeBadge');
+      badge.textContent = isEarn ? '💰 적립' : '🛍️ 차감';
+      badge.className = 'tx-type-badge ' + (isEarn ? 'earn' : 'spend');
+      document.getElementById('txBoothLabel').textContent = state.txConfig.desc;
+
+      document.getElementById('amountInput').value = '';
+      document.getElementById('pinInput').value = '';
+      updateExecuteButton();
+
+      setStatus(info.name + ' 학생 — 금액과 PIN을 입력하세요');
+    }
+
+    function startScanner() {
+      if (state.scannerRunning) return;
+      if (!state.txConfig) return;
+
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode('qr-reader');
+      }
+
+      var config = {
+        fps: 10,
+        qrbox: function(w, h) {
+          var size = Math.min(w, h) * 0.72;
+          return { width: size, height: size };
+        },
+        aspectRatio: 1.0
+      };
+
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        onScanSuccess,
+        function() {}
+      ).then(function() {
+        state.scannerRunning = true;
+        setStatus('QR 코드를 스캔해 주세요');
+      }).catch(function(err) {
+        setStatus('카메라를 사용할 수 없습니다. 권한을 확인해 주세요.');
+        console.error('Scanner error:', err);
+      });
+    }
+
+    function stopScanner() {
+      if (!html5QrCode || !state.scannerRunning) return Promise.resolve();
+      return html5QrCode.stop().then(function() {
+        state.scannerRunning = false;
+      }).catch(function() {
+        state.scannerRunning = false;
+      });
+    }
+
+    function onScanSuccess(decodedText) {
+      var qrId = decodedText.trim();
+      if (!qrId || state.isProcessing || state.phase !== 'scan') return;
+
+      var now = Date.now();
+      if (qrId === state.lastScannedId && now - state.lastScanTime < 1500) return;
+
+      state.lastScannedId = qrId;
+      state.lastScanTime = now;
+      fetchStudentInfo(qrId);
+    }
+
+    function fetchStudentInfo(qrId) {
+      state.isProcessing = true;
+      showLoading(true);
+      setStatus('학생 정보 조회 중...');
+
+      callGAS({ action: 'getStudentInfo', qrId: qrId })
+        .then(function(res) {
+          showLoading(false);
+          state.isProcessing = false;
+
+          if (!res || !res.success) {
+            showModal(false, '조회 실패', (res && res.error) || '학생 정보를 불러올 수 없습니다.');
+            setStatus('QR 코드를 다시 스캔해 주세요');
+            return;
+          }
+
+          state.qrId = res.qrId;
+          state.student = res;
+          enterPayPhase(res);
+        })
+        .catch(function(err) {
+          showLoading(false);
+          state.isProcessing = false;
+          showModal(false, '통신 오류', err.message || '서버와 통신할 수 없습니다.');
+          setStatus('QR 코드를 다시 스캔해 주세요');
+        });
+    }
+
+    function executeTransaction() {
+      if (!state.qrId || !state.txConfig) return;
+
+      var amount = Number(document.getElementById('amountInput').value);
+      var pin = document.getElementById('pinInput').value;
+
+      if (!amount || amount <= 0) {
+        showModal(false, '입력 오류', '금액을 올바르게 입력해 주세요.');
+        return;
+      }
+      if (!pin) {
+        showModal(false, '입력 오류', '관리자 PIN을 입력해 주세요.');
+        return;
+      }
+
+      state.isProcessing = true;
+      document.getElementById('btnExecute').disabled = true;
+      showLoading(true);
+      setStatus('거래 처리 중...');
+
+      callGAS({
+        action: 'processTransaction',
+        qrId: state.qrId,
+        type: state.txConfig.type,
+        amount: amount,
+        description: state.txConfig.desc,
+        pin: pin
+      })
+        .then(function(res) {
+          showLoading(false);
+          state.isProcessing = false;
+
+          if (!res || !res.success) {
+            showModal(false, '거래 실패', (res && res.error) || '거래를 처리할 수 없습니다.');
+            updateExecuteButton();
+            return;
+          }
+
+          var msg = res.message + '\n새 잔액: ' + formatMoney(res.balance) + '원';
+          showModal(true, '거래 완료', msg, function() {
+            goToMenu();
+          });
+        })
+        .catch(function(err) {
+          showLoading(false);
+          state.isProcessing = false;
+          showModal(false, '통신 오류', err.message || '서버와 통신할 수 없습니다.');
+          updateExecuteButton();
+        });
+    }
+
+    function clearTransactionForm(clearPin) {
+      document.getElementById('amountInput').value = '';
+      if (clearPin !== false) {
+        document.getElementById('pinInput').value = '';
+      }
+      updateExecuteButton();
+    }
+
+    function rescanStudent() {
+      state.qrId = null;
+      state.student = null;
+      state.lastScannedId = '';
+      state.lastScanTime = 0;
+      state.phase = 'scan';
+
+      showEl('studentCard', false);
+      showEl('txForm', false);
+      clearTransactionForm(true);
+      revealScanner();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+
+      document.querySelectorAll('.btn-mode').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          enterMode(btn.dataset.mode);
+        });
+      });
+
+      document.querySelectorAll('.booth-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+          document.querySelectorAll('.booth-pill').forEach(function(p) {
+            p.classList.remove('selected');
+          });
+          pill.classList.add('selected');
+          selectSpendBooth(pill.dataset.desc);
+        });
+      });
+
+      document.getElementById('amountInput').addEventListener('input', updateExecuteButton);
+      document.getElementById('pinInput').addEventListener('input', updateExecuteButton);
+      document.getElementById('btnExecute').addEventListener('click', executeTransaction);
+      document.getElementById('btnRescan').addEventListener('click', rescanStudent);
+      document.getElementById('btnBackMenu').addEventListener('click', goToMenu);
+    });
+  </script>
+</body>
+</html>

@@ -527,10 +527,10 @@
 
   /* 학생 정보 한 줄 렌더링 — <strong>이름</strong> / 학년학년 */
   function renderStudentInfo(name, grade) {
-    var el = document.getElementById('studentInfoLine');
-    el.innerHTML = '<strong>' + name + '</strong>'
-      + ' <span class="student-info-grade-text">/ ' + grade + '학년</span>';
-  }
+  var el = document.getElementById('studentInfoLine');
+  el.innerHTML = '<strong style="font-size:1.25rem;">' + name + '</strong>'
+    + ' <span class="student-info-grade-text">/ ' + grade + '학년</span>';
+}
 
   function showModal(isOk, title, msg, onClose) {
     document.getElementById('modalIcon').className = 'modal-icon ' + (isOk ? 'success' : 'error');
@@ -724,8 +724,9 @@
     showEl('txForm',           false);
 
     renderStudentInfo(info.name, info.grade);
-    document.getElementById('studentBalance').textContent = fmt(info.balance);
-    document.getElementById('checkAmount').textContent    = fmt(info.balance);
+    renderStudentInfo(info.name, String(info.grade));
+document.getElementById('studentBalance').textContent = fmt(info.balance);
+document.getElementById('checkAmount').textContent    = fmt(info.balance);
     setStatus(info.name + ' 학생의 잔액을 확인했습니다');
   }
 
@@ -736,8 +737,8 @@
     showEl('checkBalanceCard', false);
     showEl('checkButtons',     false);
 
-    renderStudentInfo(info.name, info.grade);
-    document.getElementById('studentBalance').textContent = fmt(info.balance);
+    renderStudentInfo(info.name, String(info.grade));
+document.getElementById('studentBalance').textContent = fmt(info.balance);
 
     resetTxForm();
 
